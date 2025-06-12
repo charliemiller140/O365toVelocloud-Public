@@ -1,0 +1,115 @@
+import requests
+import json
+import uuid
+import ipaddress
+
+# Convert CIDR notation (e.g., /24) to a dotted decimal subnet mask (e.g., 255.255.255.0)
+def cidr_to_subnet_mask(cidr):
+    subnet = ipaddress.ip_network(f"0.0.0.0/{cidr}")
+    return str(subnet.netmask)
+
+# Set your Microsoft Office 365 client ID (used to access the endpoint API)
+client_id = "office365 client id here"
+
+# Construct headers for the HTTP request to Microsoft's endpoint API
+headers = {
+    "Accept": "application/json",
+    "Content-Type": "application/json",
+    "client-request-id": str(uuid.uuid4()),  # Unique ID for tracking the request
+    "return-client-request-id": "true"       # Ask Microsoft to return our client-request-id in the response
+}
+
+# URL to fetch the worldwide list of Office 365 service IPs (IPv6 disabled here)
+url = f"https://endpoints.office.com/endpoints/worldwide?clientrequestid=client id here &NoIPv6=true"
+
+# Make the GET request to retrieve the Office 365 IP data
+response = requests.get(url, headers=headers)
+
+# Proceed only if the request was successful
+if response.status_code == 200:
+    data = response.json()  # Parse JSON response from Microsoft
+    ips = {}  # Dictionary to group IPs by service (Exchange, SharePoint, etc.)
+
+    # Loop through each item returned by the endpoint API
+    for item in data:
+        if "ips" in item:  # Only process items that contain IP addresses
+            for ip in item["ips"]:
+                # Split IP (and possibly CIDR) into components
+                ip_parts = ip.split("/")
+                ip_address = ip_parts[0]
+                subnet_mask_cidr = "32"  # Default to /32 if no CIDR is specified
+                if len(ip_parts) > 1:
+                    subnet_mask_cidr = ip_parts[1]
+                subnet_mask = cidr_to_subnet_mask(subnet_mask_cidr)
+
+                # Identify the Office 365 service area (e.g., Exchange, SharePoint)
+                service_area = item["serviceAreaDisplayName"]
+                service_group = "O365-Common-API"  # Default group if no match
+
+                # Reassign based on known service keywords
+                if "Exchange" in service_area:
+                    service_group = "O365-Exchange-API"
+                elif "SharePoint" in service_area:
+                    service_group = "O365-SharePoint-API"
+                elif "Skype" in service_area:
+                    service_group = "O365-Skype-API"
+
+                # Group IPs by service_group for VCO object group updates
+                if service_group not in ips:
+                    ips[service_group] = []
+
+                # Add IP entry formatted for VCO object group update
+                ips[service_group].append({
+                    "type": "ADDRESS_GROUP_ENTITY",
+                    "ip": ip_address,
+                    "rule_type": "prefix",  # Indicates use of a subnet/mask rule
+                    "mask": subnet_mask
+                })
+
+    # Credentials and target API endpoint for VMware VCO
+    api_token = ""       # Your VCO API token goes here
+    enterprise_id = ""   # Your VCO Enterprise ID goes here
+    vco_url = "" # Your orgs VCO URL
+
+    # Send each service group and its IP list to the matching object group ID in VCO
+    for service_group, ip_list in ips.items():
+        object_group_id = ""
+
+        # Match the service group to its corresponding VCO object group ID
+        if service_group == "O365-Common-API":
+            object_group_id = "200689"
+        elif service_group == "O365-Exchange-API":
+            object_group_id = "200690"
+        elif service_group == "O365-SharePoint-API":
+            object_group_id = "200693"
+        elif service_group == "O365-Skype-API":
+            object_group_id = "200694"
+
+        # If a valid group ID is found, construct and send the payload
+        if object_group_id:
+            payload = {
+                "enterpriseId": int(enterprise_id),
+                "id": int(object_group_id),
+                "name": service_group,
+                "description": f"Office 365 IP addresses ({service_group})",
+                "data": ip_list
+            }
+
+            # Make POST request to update the object group in VCO
+            response = requests.post(
+                vco_url,
+                headers={
+                    "Authorization": f"Token {api_token}",
+                    "Content-Type": "application/json"
+                },
+                json=payload
+            )
+
+            # Log success or failure
+            if response.status_code == 200:
+                print(f"Object group {service_group} updated successfully.")
+            else:
+                print(f"Failed to update object group {service_group}.")
+                print(response.text)
+else:
+    print("Failed to retrieve Office 365 endpoints.")
