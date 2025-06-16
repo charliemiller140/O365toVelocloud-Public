@@ -97,6 +97,12 @@ Failed to update object group O365-Exchange-API.
 
 ---
 
+##Sources
+
+URLs and IP address ranges
+
+https://learn.microsoft.com/en-us/microsoft-365/enterprise/urls-and-ip-address-ranges?view=o365-worldwide
+
 ## Disclaimer
 
 This script is provided as-is. Always test in a non-production environment before deploying to production.
