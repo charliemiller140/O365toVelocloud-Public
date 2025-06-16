@@ -13,7 +13,7 @@ This script eliminates that manual overhead by automatically:
 * Pulling Microsoft’s latest IP list for Office 365 services
 * Classifying IPs into Exchange, SharePoint, Skype, and Common service groups
 * Converting CIDR blocks into subnet masks as Velocloud only accepts subnet masks, but O365 outputs CIDR
-* Updating the corresponding object groups on VCO via API (**Common-API, Exchange, SharePoint-API, Skype**)
+* Updating the corresponding object groups on VCO via API (**Common-API, Exchange, SharePoint and Skype**)
 
 This ensures endpoint definitions are always current when using object groups.
 
