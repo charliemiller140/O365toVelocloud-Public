@@ -59,6 +59,7 @@ Ensure you replace the `object_group_id` values if your VCO object groups differ
 "O365-Common-API": "99999"
 ```
 
+Might be helpful to run a few Postman requests to find your object groups first.
 ---
 
 ## How It Works
